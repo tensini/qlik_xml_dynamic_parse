@@ -10,6 +10,8 @@ SET vXML_Delimiter = ";";
 SET vXML_File      = "[lib://Desktop/example.xml](txt, codepage is 1252, no labels, delimiter is '$(vXML_Delimiter)', msq)";
 
 
+
+// Identify how many valid fields exist in the XML
 TMP_Fields_Qty:
 LOAD
  SubStringCount($(vXML_Column),'</') as Q_Fields
@@ -20,6 +22,8 @@ LET vXML_Fields_Qty = Peek('Q_Fields');
 DROP Table TMP_Fields_Qty;
 
 
+
+// Clear the tag from the fields and get their content.
 FOR i =  1 to $(vXML_Fields_Qty)
  
  Data:
@@ -33,6 +37,7 @@ NEXT // FOR i =  1 to $(vXML_Fields_Qty)
 
 
 
+// Eliminates fields that have no content or are used as a hierarchy.
 Fields:
 LOAD Distinct
  Concat(distinct '[' & XML_ColumnName & ']', ',') as Fields
@@ -42,6 +47,9 @@ RESIDENT [Data]
 LET vXML_Fields = Peek('Fields',0,'Fields');
 
 
+
+// Fields with no content are considered to be hierarchy fields and possibly their source table.
+// You can verify this is correct by manually loading XML and looking at the table name.
 Tables:
 LOAD Distinct
  Concat(distinct XML_ColumnName, '/')             as Tables
@@ -51,6 +59,7 @@ RESIDENT [Data]
 LET vXML_Tables = Peek('Tables',0,'Tables');
 
 
+// Maintenance
 DROP Tables
  Data,
  Fields,
@@ -58,7 +67,8 @@ DROP Tables
  ;
 
 
-// XML one row Simulation:
+
+// Simulating an XML file and keeping all fields on a single line
 XMLTABLE:
 LOAD
  Concat(Column, '', RecNo) as XMLFIELD
@@ -69,9 +79,14 @@ LOAD
 FROM $(vXML_File);
 
 
+
+// Specific load in simple XML mode
 Table:
 LOAD
   $(vXML_Fields)
 FROM_FIELD('XMLTABLE','XMLFIELD') (xmlSimple, table is [$(vXML_Tables)]);
 
+
+
+// Maintenance
 DROP Table XMLTABLE;
