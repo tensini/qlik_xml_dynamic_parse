@@ -1,0 +1,77 @@
+/*
+ Link: https://github.com/tensini/qlik_xml_dynamic_parse
+ Created by http://linkedin.com/in/tensini
+*/
+
+
+// Config:
+SET vXML_Column    = "@1";
+SET vXML_Delimiter = ";";
+SET vXML_File      = "[lib://Desktop/example.xml](txt, codepage is 1252, no labels, delimiter is '$(vXML_Delimiter)', msq)";
+
+
+TMP_Fields_Qty:
+LOAD
+ SubStringCount($(vXML_Column),'</') as Q_Fields
+FROM $(vXML_File);
+
+LET vXML_Fields_Qty = Peek('Q_Fields');
+
+DROP Table TMP_Fields_Qty;
+
+
+FOR i =  1 to $(vXML_Fields_Qty)
+ 
+ Data:
+ LOAD 
+  Replace( TextBetween( SubField( Replace([$(vXML_Column)], '/', ''), '><', $(i)), '', '>'), '<', '') as XML_ColumnName,
+  TextBetween( SubField([$(vXML_Column)], '><', $(i)), '>', '<')                                      as XML_Data 
+ FROM $(vXML_File)
+;
+	
+NEXT // FOR i =  1 to $(vXML_Fields_Qty)
+
+
+
+Fields:
+LOAD Distinct
+ Concat(distinct '[' & XML_ColumnName & ']', ',') as Fields
+RESIDENT [Data]
+ Where Len(Trim(XML_Data)) > 0;
+
+LET vXML_Fields = Peek('Fields',0,'Fields');
+
+
+Tables:
+LOAD Distinct
+ Concat(distinct XML_ColumnName, '/')             as Tables
+RESIDENT [Data]
+ Where Len(Trim(XML_Data)) = 0;
+
+LET vXML_Tables = Peek('Tables',0,'Tables');
+
+
+DROP Tables
+ Data,
+ Fields,
+ Tables
+ ;
+
+
+// XML one row Simulation:
+XMLTABLE:
+LOAD
+ Concat(Column, '', RecNo) as XMLFIELD
+;
+LOAD
+ RecNo()                   as RecNo,
+ [$(vXML_Column)]          as Column
+FROM $(vXML_File);
+
+
+Table:
+LOAD
+  $(vXML_Fields)
+FROM_FIELD('XMLTABLE','XMLFIELD') (xmlSimple, table is [$(vXML_Tables)]);
+
+DROP Table XMLTABLE;
